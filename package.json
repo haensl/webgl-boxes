@@ -1,0 +1,33 @@
+{
+  "name": "webgl-cubes",
+  "version": "1.0.0",
+  "description": "WebGL based cube animation.",
+  "main": "index.js",
+  "engines": {
+    "node": ">= 6.8.4"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haensl/webgl-cubes.git"
+  },
+  "keywords": [
+    "webgl",
+    "threejs",
+    "three-js",
+    "animation",
+    "cubes",
+    "boxes"
+  ],
+  "author": "HP Dietz <h.p.dietz@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/haensl/webgl-cubes/issues"
+  },
+  "homepage": "https://github.com/haensl/webgl-cubes#readme",
+  "dependencies": {
+    "three": "^0.88.0"
+  }
+}

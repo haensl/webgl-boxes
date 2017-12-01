@@ -39,6 +39,81 @@
 
   boot()
     .then((THREE) => {
+      Math.rand = (min, max) =>
+        Math.random() * (max - min) + min;
+
+      const Cube = (() => {
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshPhongMaterial({
+          color: 0x00ff00,
+          opacity: 0.3,
+          transparent: true,
+          emissive: 0x00ff00,
+          emissiveIntensity: 0.3
+        });
+        const edges = new THREE.EdgesGeometry(geometry);
+        const edgesMaterial = new THREE.LineBasicMaterial({
+          color: 0x00ff00
+        });
+
+        return (options = {}) => {
+          const cube = new THREE.Object3D();
+          const mesh = new THREE.Mesh(geometry, material.clone());
+          const wireframe = new THREE.LineSegments(edges, edgesMaterial.clone());
+          cube.add(mesh);
+          cube.add(wireframe);
+
+          if (options.position) {
+            cube.position.add(options.position);
+          }
+
+          if (options.color) {
+            mesh.material.setValues({
+              emissive: options.color,
+              color: options.color
+            });
+            wireframe.material.setValues({
+              color: options.color
+            });
+          }
+
+          cube.direction = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
+          cube.speed = Math.random();
+          cube.update = ((cube, dt) => {
+            const distance = dt * cube.speed;
+            cube.position = cube.position.add(cube.direction.clone().multiplyScalar(distance));
+          }).bind(null, cube);
+
+          return cube;
+        };
+      })();
+
+      const World = (() => {
+        return (options = {
+          width: 10,
+          height: 5,
+          depth: 5,
+          objects: []
+        }) => {
+          const geometry = new THREE.BoxGeometry(options.width, options.height, options.depth);
+          const material = new THREE.MeshBasicMaterial({
+            wireframe: true
+          });
+          const world = new THREE.Mesh(geometry, material);
+          options.objects.forEach((o) => {
+            world.add(o);
+          });
+          world.objects = options.objects;
+          world.update = ((world, dt) => {
+            world.objects.forEach((object) => {
+              if (typeof object.update === 'function') {
+                object.update(dt);
+              }
+            })
+          }).bind(null, world);
+          return world;
+        }
+      })();
       const container = document.getElementById('cubes-container');
       const dimensions = setView(container);
       const scene = new THREE.Scene();
@@ -48,7 +123,9 @@
         0.1, // near
         1000 // far
       );
-      camera.position.z = 5;
+      camera.position.x = -10;
+      camera.position.z = 20;
+      camera.rotation.y = (camera.fov / 2) * Math.PI / 180 * -1;
       const renderer = new THREE.WebGLRenderer({
         antialias: true
       });
@@ -57,34 +134,17 @@
       const spot = new THREE.SpotLight(0xffffff);
       spot.position.set(0, 0.5, 1);
 
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x00ff00,
-        opacity: 0.3,
-        transparent: true,
-        emissive: 0xfff81a,
-        emissiveIntensity: 0.3
-      });
-      const cube = new THREE.Mesh(geometry, material);
-
-      const edges = new THREE.EdgesGeometry(geometry);
-      const edgesMaterial = new THREE.LineBasicMaterial({
-        color: 0x00ff00,
-        lineWidth: 2
-      });
-      const wireframe = new THREE.LineSegments(edges, edgesMaterial);
-
-      const cubeGroup = new THREE.Object3D();
-      cubeGroup.add(cube);
-      cubeGroup.add(wireframe);
+      const cubes = [0xff0000, 0x00ff00, 0x0000ff].map((color) =>
+        Cube({
+          position: new THREE.Vector3(Math.rand(-5, 5), Math.rand(-5, 5), Math.rand(-5, 5)),
+          color
+        }));
 
       let lastIteration;
       const animate = (timestamp) => {
         if (typeof lastIteration === 'number') {
           const dt = (timestamp - lastIteration) / 1000;
-          const rotation = dt / 1.6;
-          cubeGroup.rotation.x += rotation;
-          cubeGroup.rotation.y += rotation;
+          world.update(dt);
           renderer.render(scene, camera);
         }
 
@@ -92,8 +152,17 @@
         window.requestAnimationFrame(animate);
       };
 
-      scene.add(spot);
-      scene.add(cubeGroup);
+      const objects = cubes.slice();
+      objects.push(spot);
+      const world = World({
+        width: 20,
+        height: 10,
+        depth: 10,
+        objects
+      });
+
+      scene.add(world);
+      
       container.appendChild(renderer.domElement);
       animate();
 

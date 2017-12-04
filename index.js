@@ -48,7 +48,7 @@
 
       const Cube = (() => {
         const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshPhongMaterial({
+        const material = new THREE.MeshStandardMaterial({
           color: 0x00ff00,
           opacity: 0.9,
           transparent: true,
@@ -83,7 +83,8 @@
 
         return (options = {}) => {
           const cube = new THREE.Object3D();
-          const mesh = new THREE.Mesh(geometry, material.clone());
+          const m = new THREE.MeshNormalMaterial();
+          const mesh = new THREE.Mesh(geometry.clone(), m); // material.clone()
           const wireframe = new THREE.LineSegments(edges, edgesMaterial.clone());
           cube.add(mesh);
           cube.add(wireframe);
@@ -107,7 +108,7 @@
           }
 
           cube.userData.direction = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
-          cube.userData.speed = options.speed || Math.rand(1, 2);
+          cube.userData.speed = options.speed || Math.rand(0.5, 1);
           cube.userData.collisionMask = bitMasks.cube | bitMasks.world;
           cube.userData.update = update.bind(null, cube);
           cube.userData.updateBoundingBoxWorld = updateBoundingBoxWorld.bind(null, cube);
@@ -124,12 +125,32 @@
           }
         };
         const handleCollisions = (world) =>
-          Array.from(world.userData.physicsBodies
+          Array.from((world.userData.physicsBodies || [])
             .reduce((c, body, index, physicsBodies) => {
               if (c.has(body)) {
                 return c;
               }
 
+              for (let i = 0, plane; i < world.userData.planes.length; i++) {
+                plane = world.userData.planes[i];
+                if ((body.userData.collisionMask & bitMasks.world)
+                  && (body.userData.boundingBoxWorld.intersectsBox(plane.userData.boundingBox))) {
+                    console.log('cube hit plane', plane.name, plane.userData.normal);
+                    console.log('direction before reflection', body.userData.direction);
+                    console.log('position', body.position);
+                    // body.userData.direction = 
+                    body.userData.direction.reflect(plane.userData.normal).normalize();
+                    console.log('direction after reflection', body.userData.direction);
+                    while (body.userData.boundingBoxWorld.intersectsBox(plane.userData.boundingBox)) {
+                      body.userData.update(0.0001);
+                    }
+
+                    c.add(body);
+                    return c;
+                  }
+              }
+
+              /**
               if ((body.userData.collisionMask & bitMasks.world)
                   && !world.geometry.boundingBox.containsBox(body.userData.boundingBoxWorld)) {
                 const closestPlane = world.planes.map((plane) => ({
@@ -143,7 +164,7 @@
 
                 c.add(body);
                 return c;
-              }
+              }*/
 
               for (let i = 0, otherBody; i < physicsBodies.length; i++) {
                 otherBody = physicsBodies[i];
@@ -153,8 +174,10 @@
 
                 if ((otherBody.userData.collisionMask & body.userData.collisionMask)
                   && body.userData.boundingBoxWorld.intersectsBox(otherBody.userData.boundingBoxWorld)) {
-                  body.userData.direction = body.userData.direction.reflect(body.userData.direction.projectOnVector(otherBody.userData.direction)).normalize();
-                  otherBody.userData.direction = otherBody.userData.direction.reflect(otherBody.userData.direction.projectOnVector(body.userData.direction)).normalize();
+                  // body.userData.direction = 
+                  body.userData.direction.reflect(body.userData.direction.projectOnVector(otherBody.userData.direction)).normalize();
+                  // otherBody.userData.direction = 
+                  otherBody.userData.direction.reflect(otherBody.userData.direction.projectOnVector(body.userData.direction)).normalize();
                   while(body.userData.boundingBoxWorld.intersectsBox(otherBody.userData.boundingBoxWorld)) {
                     body.userData.update(0.0001);
                     otherBody.userData.update(0.0001);
@@ -176,6 +199,17 @@
           
           world.handleCollisions();
         };
+        const material = new THREE.MeshStandardMaterial({
+          color: 0x333333
+        });
+        const normals = {
+          left: new THREE.Vector3(1, 0, 0),
+          right: new THREE.Vector3(-1, 0, 0),
+          bottom: new THREE.Vector3(0, 1, 0),
+          top: new THREE.Vector3(0, -1, 0),
+          back: new THREE.Vector3(0, 0, 1),
+          front: new THREE.Vector3(0, 0, -1)
+        };
 
         return (options = {
           width: 10,
@@ -184,51 +218,114 @@
           objects: [],
           color: 0x333333
         }) => {
-          const geometry = new THREE.BoxGeometry(options.width, options.height, options.depth);
-          geometry.computeBoundingBox();
-          const material = new THREE.MeshStandardMaterial({
-            color: options.color,
-            //wireframe: true,
-            dithering: true,
-            flatShading: true,
-            side: THREE.DoubleSide
+          const planes = [
+            normals.left,
+            normals.right
+          ].map((normal) => {
+            const geometry = new THREE.PlaneGeometry(options.height, options.depth);
+            const material = new THREE.MeshStandardMaterial({
+              color: options.color,
+              //wireframe: true,
+              lights: true,
+              emissive: options.color,
+              receivesShadow: true
+            });
+            const plane = new THREE.Mesh(geometry, material);
+            plane.userData.normal = normal.clone();
+            return plane;
+          }).concat([
+            normals.bottom,
+            normals.top,
+            normals.back,
+            normals.front
+          ].map((normal) => {
+            const geometry = new THREE.PlaneGeometry(options.width, options.depth);
+            const material = new THREE.MeshStandardMaterial({
+              color: options.color,
+              //wireframe: true,
+              lights: true,
+              side: THREE.DoubleSide,
+              emissive: options.color,
+              receivesShadow: true
+            });
+
+            const plane = new THREE.Mesh(geometry, material);
+            plane.userData.normal = normal;
+            return plane;
+          })).map((plane) => {
+            const normal = plane.userData.normal
+            if (normal.equals(normals.top)) {
+              plane.position.y = options.height / 2;
+              plane.rotation.x = 1.5708;
+              plane.userData.boundingBox = new THREE.Box3(
+                new THREE.Vector3(options.width / -2, options.height / 2, options.depth / -2),
+                new THREE.Vector3(options.width / 2, options.height / 2, options.depth / 2)
+              );
+              plane.name = 'world.top';
+            } else if (normal.equals(normals.bottom)) {
+              plane.position.y = options.height / -2;
+              plane.name = 'world.bottom';
+              plane.rotation.x = 1.5708;
+              plane.userData.boundingBox = new THREE.Box3(
+                new THREE.Vector3(options.width / -2, options.height / -2, options.depth / -2),
+                new THREE.Vector3(options.width / 2, options.height / -2, options.depth / 2)
+              );
+            } else if (normal.equals(normals.left)) {
+              plane.rotation.y = 1.5708;
+              plane.position.x = options.width / -2;
+              plane.name = 'world.left';
+              plane.userData.boundingBox = new THREE.Box3(
+                new THREE.Vector3(options.width / -2, options.height / -2, options.depth / -2),
+                new THREE.Vector3(options.width / -2, options.height / 2, options.depth / 2)
+              );
+            } else if (normal.equals(normals.right)) {
+              plane.rotation.y = -1.5708;
+              plane.position.x = options.width / 2;
+              plane.name = 'world.right';
+              plane.userData.boundingBox = new THREE.Box3(
+                new THREE.Vector3(options.width / 2, options.height / -2, options.depth / -2),
+                new THREE.Vector3(options.width / 2, options.height / 2, options.depth / 2)
+              );
+            } else if (normal.equals(normals.back)) {
+              plane.position.z = options.depth / -2;
+              plane.name = 'world.back';
+              plane.userData.boundingBox = new THREE.Box3(
+                new THREE.Vector3(options.width / -2, options.height / -2, options.depth / -2),
+                new THREE.Vector3(options.width / 2, options.height / 2, options.depth / -2)
+              );
+            } else if (normal.equals(normals.front)) {
+              plane.position.z = options.depth / 2;
+              //plane.material.transparent = true;
+              //plane.material.opacity = 0;
+              plane.name = 'world.front';
+              plane.userData.boundingBox = new THREE.Box3(
+                new THREE.Vector3(options.width / -2, options.height / -2, options.depth / 2),
+                new THREE.Vector3(options.width / 2, options.height / 2, options.depth / 2)
+              );
+            }
+            
+            return plane;
           });
-          const world = new THREE.Mesh(geometry, material);
-          world.addObject = addObject.bind(null, world);
+
+          const world = new THREE.Object3D();
+          world.userData.planes = planes;
           world.update = update.bind(null, world);
           world.handleCollisions = handleCollisions.bind(null, world);
           world.userData.physicsBodies = [];
-          world.receiveShadow = true;
-          world.planes = [
-            new THREE.Plane(new THREE.Vector3(1, 0, 0), options.width / 2),
-            new THREE.Plane(new THREE.Vector3(-1, 0, 0), options.width / 2),
-            new THREE.Plane(new THREE.Vector3(0, 1, 0), options.height / 2),
-            new THREE.Plane(new THREE.Vector3(0, -1, 0), options.height / 2),
-            new THREE.Plane(new THREE.Vector3(0, 0, 1), options.depth / 2),
-            new THREE.Plane(new THREE.Vector3(0, 0, -1), options.depth / 2)
-          ];
-          options.objects.forEach((o) => {
-            world.addObject(o);
+          world.addObject = addObject.bind(null, world);
+
+          planes.forEach((plane) => {
+            world.add(plane);
           });
+          /**
+          options.objects.forEach((o) => {
+            scene.add(o);
+            //world.addObject(o);
+          });*/
           return world;
         }
       })();
 
-      const Spot = (targetPosition = new THREE.Vector3(0, 0, 0)) => {
-        const light = new THREE.SpotLight(
-          0xffffff, // color
-          2, // intensity
-          //aspectRatio * 10, // distance from the light where intensity is 0
-          //2 // decay
-        );
-        light.castShadow = true;
-        light.angle = 1.2;
-        light.penumbra = 0.2;
-        light.decay = 2;
-        light.distance = 50;
-
-        return light;
-      };
       const container = document.getElementById('cubes-container');
       const dimensions = setView(container);
       const scene = new THREE.Scene();
@@ -247,25 +344,16 @@
       renderer.setSize(dimensions.width, dimensions.height);
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      //renderer.sortObjects = false;
       renderer.gammaInput = true;
       renderer.gammaOutput = true;
 
-      const cubes = [0xff0000, 0x00ff00, 0x0000ff].map((color) =>
+      //0x00ff00, 0x0000ff
+      const cubes = [0xff0000].map((color) =>
         Cube({
-          position: new THREE.Vector3(Math.rand(-4, 4), Math.rand(-4, 4), Math.rand(-4, 4)),
+          //position: new THREE.Vector3(Math.rand(-6, 6), Math.rand(-4, 4), Math.rand(-4, 4)),
           color
         }));
-
-      /**
-      const spots = [
-        new THREE.Vector3(0, 0, 5),
-        new THREE.Vector3(0, 0, -5),
-        new THREE.Vector3(0, 5, 0),
-        new THREE.Vector3(0, -5, 0),
-        new THREE.Vector3(aspectRatio * 10 / 2, 0, 0),
-        new THREE.Vector3(aspectRatio * 10 / -2, 0, 0)
-      ].map((targetPosition) => Spot(targetPosition));
-      */
 
       let lastIteration;
       const animate = (timestamp) => {
@@ -279,34 +367,30 @@
         window.requestAnimationFrame(animate);
       };
 
-      /**
-      spots.forEach((spot) => {
-        objects.push(spot.target);
-        objects.push(spot.light);
-      });*/
-      const spotTop = Spot();
-      spotTop.position.set(0, 5, 0);
-      const spotBottom = Spot();
-      spotBottom.position.set(0, -5, 0);
-      objects = cubes.concat([spotTop, spotBottom]);
+      const point = new THREE.PointLight(0xffffff, 1, 5, 2);
+      point.castShadow = true;
+      point.penumbra = 0.2;
+      point.decay = 2;
+      point.distance = 100;
+      const objects = cubes.concat([point]);
       const world = World({
         width: aspectRatio * 10,
         height: 10,
         depth: 10,
-        objects,
-        color: 0x333333
+        objects: cubes,
+        color: 0x111111
       });
 
       scene.add(world);
-      /**
-      spots.forEach((spot) => {
-        spot.light.target = spot.target
-      });*/
+      scene.add(point);
+      cubes.forEach((c) => scene.add(c));
       console.log(world);
       
       container.appendChild(renderer.domElement);
       animate();
 
       window.addEventListener('resize', setView.bind(container, camera, renderer), false);
+      window.THREE = THREE;
+      window.scene = scene;
     });
 })();

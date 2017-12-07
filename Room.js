@@ -28,6 +28,7 @@
           color: 0x333333
         }) {
           super();
+          this.name = 'room';
           this.planes = [
             normals.left,
             normals.right

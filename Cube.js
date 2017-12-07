@@ -14,6 +14,7 @@
           speed: Math.rand(0.5, 1)
         }) {
           super();
+          this.name = 'cube';
           const material = new THREE.MeshStandardMaterial({
             color: options.color,
             opacity: options.opacity,
@@ -28,6 +29,8 @@
           });
           const mesh = new THREE.Mesh(this.geometry, material);
           const wireframe = new THREE.LineSegments(edges, edgesMaterial);
+          mesh.name = 'cube.mesh';
+          wireframe.name = 'cube.wireframe';
           this.add(mesh);
           this.add(wireframe);
           this.castShadow = true;

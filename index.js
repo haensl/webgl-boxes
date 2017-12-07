@@ -40,6 +40,7 @@
       const container = document.getElementById('cubes-container');
       const dimensions = setView(container);
       const scene = new THREE.Scene();
+      scene.name = 'scene';
       const aspectRatio = dimensions.width / dimensions.height;
       const camera = new THREE.PerspectiveCamera(
         45, // field of view
@@ -78,6 +79,7 @@
       point.penumbra = 0.2;
       point.decay = 2;
       point.distance = 100;
+      point.name = 'pointlight';
 
       world.add(point);
 

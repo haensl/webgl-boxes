@@ -1,37 +1,11 @@
 (() => {
   'use strict';
-  if (typeof window.WEBGL_CUBES === 'undefined') {
-    window.WEBGL_CUBES = {
-      boot: (dependencies = []) =>
-        new Promise((resolve) => {
-          const waitForDependencies = (root) => {
-            const isDefined = (root, property) =>
-              typeof root[property] !== 'undefined';
-
-            if (dependencies.every((dependency) => {
-              if (dependency.indexOf('.') > -1) {
-                dependency.split('.').reduce((depInfo, curr) =>
-
-                  isDefined(depInfo., curr))
-                return isDefined(root, contexts[0])
-                  && waitForDependencies(root[contexts[0]]dependencies.slice(1));
-              }
-              
-              return isDefined(root, dependencies);
-            }) {
-              return resolve();
-            }
-
-            window.setTimeout(waitForDependencies, 10);
-          };
-
-          window.setTimeout(waitForDependencies);
-        })
-    };
+  if (typeof WEBGL_CUBES.World !== 'undefined') {
+    return;
   }
 
-  WEBGL_CUBES.boot(['THREE'])
-    .then((THREE) => {
+  WEBGL_CUBES.boot(['THREE'],
+    (THREE) => {
       const bitmasks = {
         room: 1,  // 001
         cube: 2   // 010
@@ -43,8 +17,6 @@
         constructor(scene) {
           this.scene = scene;
           this.physicsBodies = [];
-
-          return this;
         }
 
         static get bitmasks() {

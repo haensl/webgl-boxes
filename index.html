@@ -16,5 +16,42 @@
     <script src="/Cube.js" async></script>
     <script src="/World.js" async></script>
     <script src="/index.js" async></script>
+    <script>
+      (() => {
+        'use strict';
+        if (typeof window.WEBGL_CUBES === 'undefined') {
+          window.WEBGL_CUBES = {
+            boot: (dependencies = [], callback) => {
+              const waitForDependencies = (root = window) => {
+                let currentRoot = root;
+                const deps = [];
+                if (dependencies.every((dependency, index) => {
+                  for (let context of dependency.split('.')) {
+                    if (!(context in currentRoot)) {
+                      currentRoot = root;
+                      return false;
+                    }
+
+                    currentRoot = currentRoot[context];
+                  }
+
+                  deps[index] = currentRoot;
+                  currentRoot = root;
+                  return true;
+                })) {
+                  if (typeof callback === 'function') {
+                    return callback.apply(null, deps);
+                  }
+                }
+
+                window.setTimeout(waitForDependencies, 10);
+              };
+
+              window.setTimeout(waitForDependencies);
+            }
+          };
+        }
+      })();
+    </script>
   </body>
 </html>

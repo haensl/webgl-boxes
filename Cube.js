@@ -1,37 +1,17 @@
 (() => {
   'use strict';
-  if (typeof window.WEBGL_CUBES === 'undefined') {
-    window.WEBGL_CUBES = {
-      boot: (dependencies = []) =>
-        new Promise((resolve) => {
-          const waitForDependencies = () => {
-            if (dependencies.every((dependency) => {
-              if (dependency.indexOf('.') > -1) {
-                const contexts = dependency.split('.');
-                return typeof root[contexts[0]] !== 'undefined'
-                  && waitForDependencies(dependencies.slice(1))
-                    .then(() => resolve());
-                ;
-              } else if (root[dependency]) {
-                return resolve();
-              }
-            }
-
-            window.setTimeout(waitForDependencies, 10);
-          };
-
-          window.setTimeout(waitForDependencies);
-        })
-    };
+  if (typeof WEBGL_CUBES.Cube !== 'undefined') {
+    return;
   }
 
-  WEBGL_CUBES.boot(['THREE'])
-    .then((THREE) => {
+  WEBGL_CUBES.boot(['THREE', 'WEBGL_CUBES.World'],
+    (THREE, World) => {
       WEBGL_CUBES.Cube = class extends THREE.Object3D {
         constructor(options = {
           color: 0x00ff00,
           opacity: 0.8,
-          emissiveIntensity: 0.3
+          emissiveIntensity: 0.3,
+          speed: Math.rand(0.5, 1)
         }) {
           super();
           const material = new THREE.MeshStandardMaterial({
@@ -40,7 +20,6 @@
             emissive: options.color,
             emissiveIntensity: options.emissiveIntensity,
             lights: true,
-            speed: Math.rand(0.5, 1)
           });
           this.geometry = new THREE.BoxGeometry(1, 1, 1);
           const edges = new THREE.EdgesGeometry(this.geometry);
@@ -64,13 +43,15 @@
             Math.random
           ).normalize();
           this.userData.speed = options.speed;
-          this.userData.collisionMask = World.bitmaks.cube | World.bitmasks.room;
+          this.userData.collisionMask = World.bitmasks.cube | World.bitmasks.room;
           this.updateBoundingBox();
-
-          return this;
         }
 
         updateBoundingBox() {
+          if (!this.geometry.boundingBox) {
+            this.geometry.computeBoundingBox();
+          }
+
           this.userData.boundingBox = new THREE.Box3(
             this.position.clone().add(this.geometry.boundingBox.min),
             this.position.clone().add(this.geometry.boundingBox.max)

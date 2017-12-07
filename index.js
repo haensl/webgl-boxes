@@ -1,29 +1,5 @@
 (() => {
   'use strict';
-  if (typeof window.WEBGL_CUBES === 'undefined') {
-    window.WEBGL_CUBES = {
-      boot: (dependencies = []) =>
-        new Promise((resolve) => {
-          const waitForDependencies = (root) => {
-            if (dependencies.every((dependency) => {
-              if (dependency.indexOf('.') > -1) {
-                const contexts = dependency.split('.');
-                return typeof root[contexts[0]] !== 'undefined'
-                  && waitForDependencies(dependencies.slice(1))
-                    .then(() => resolve());
-                ;
-              } else if (root[dependency]) {
-                return resolve();
-              }
-            }
-
-            window.setTimeout(waitForDependencies, 10);
-          };
-
-          window.setTimeout(waitForDependencies);
-        })
-    };
-  }
   const setView = (container, camera, renderer) => {
     const width = container.clientWidth || parseInt(container.style.width, 10);
     const height = container.clientHeight || parseInt(container.style.height, 10);
@@ -49,12 +25,15 @@
     };
   };
 
-  WEBGL_CUBES.boot([
+  const dependencies = [
     'THREE',
     'WEBGL_CUBES.Cube',
     'WEBGL_CUBES.World',
     'WEBGL_CUBES.Room'
-  ]).then((THREE) => {
+  ];
+
+  WEBGL_CUBES.boot(dependencies,
+    (THREE, Cube, World, Room) => {
       Math.rand = (min, max) =>
         Math.random() * (max - min) + min;
 
@@ -69,6 +48,7 @@
         10 // far
       );
       camera.position.z = 17.1;
+      camera.rotation.y = 0.22
       const renderer = new THREE.WebGLRenderer({
         antialias: true,
       });
@@ -81,17 +61,27 @@
       renderer.gammaOutput = true;
 
       //0x00ff00, 0x0000ff
-      const world = new WEBGL_CUBES.World(scene);
+      const world = new World(scene);
       const cubes = [0xff0000].map((color) =>
-        new WEBGL_CUBES.Cube({
+        new Cube({
           //position: new THREE.Vector3(Math.rand(-6, 6), Math.rand(-4, 4), Math.rand(-4, 4)),
           color
         }));
-      const room = new WEBGL_CUBES.Room();
+      const room = new Room();
       world.add(room);
       cubes.forEach((cube) => {
         world.add(cube);
       });
+
+      const point = new THREE.PointLight(0xffffff, 1, 5, 2);
+      point.castShadow = true;
+      point.penumbra = 0.2;
+      point.decay = 2;
+      point.distance = 100;
+
+      world.add(point);
+
+      console.log(world);
 
       let lastIteration;
       const animate = (timestamp) => {
@@ -105,16 +95,6 @@
         window.requestAnimationFrame(animate);
       };
 
-      const point = new THREE.PointLight(0xffffff, 1, 5, 2);
-      point.castShadow = true;
-      point.penumbra = 0.2;
-      point.decay = 2;
-      point.distance = 100;
-
-      world.add(point);
-      scene.add(world);
-      console.log(world);
-      
       container.appendChild(renderer.domElement);
       animate();
 
